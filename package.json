@@ -6,7 +6,10 @@
   "main": "dist/plugin.js",
   "openclaw": {
     "id": "lobster-perpetual-engine",
-    "entry": "dist/plugin.js"
+    "entry": "dist/plugin.js",
+    "extensions": [
+      "./dist/plugin.js"
+    ]
   },
   "scripts": {
     "build": "tsc",

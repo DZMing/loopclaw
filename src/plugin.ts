@@ -15,7 +15,7 @@ import { PerpetualEngineService } from "./engine/service.js";
 import { loadConfig } from "./config.js";
 
 // v2.48: 插件版本常量
-const PLUGIN_VERSION = "v2.48.0";
+const PLUGIN_VERSION = "v2.50.0";
 
 export default function register(api: OpenClawPluginApi) {
   const logger = api.logger;
