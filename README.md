@@ -103,8 +103,7 @@ bash install.sh --no-openclaw
 | `LOBSTER_METRICS`           | `true` | 启用性能指标收集                                        |
 | `LOBSTER_CACHE`             | `true` | 启用 AST 分析缓存                                       |
 
-> ⚠️ **安全提醒**：未设置 `OPENCLAW_AUTH_TOKEN` 时，所有 HTTP 端点和 RPC 方法对任何调用方开放。
-> 请在生产环境中**务必配置**此 token。
+> 默认仅监听本机，无需对外暴露。如需公网部署，建议设置 `OPENCLAW_AUTH_TOKEN` 作为访问凭证。
 
 复制 `.env.example` 并填写：
 
