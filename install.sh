@@ -2,7 +2,7 @@
 # 龙虾永动引擎 — 一键安装脚本
 #
 # 用法（推荐）:
-#   curl -fsSL https://raw.githubusercontent.com/zhimingdeng/lobster-perpetual-engine/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/DZMing/loopclaw/main/install.sh | bash
 #
 # 或 clone 后本地运行:
 #   bash install.sh [--dir <安装目录>] [--plugin-dir <插件目录>] [--no-link] [--no-openclaw]
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --no-openclaw        跳过 OpenClaw 插件注册步骤"
       echo ""
       echo "一键安装（无需提前 clone）:"
-      echo "  curl -fsSL https://raw.githubusercontent.com/zhimingdeng/lobster-perpetual-engine/main/install.sh | bash"
+      echo "  curl -fsSL https://raw.githubusercontent.com/DZMing/loopclaw/main/install.sh | bash"
       exit 0 ;;
     *) die "未知参数: $1（使用 --help 查看帮助）" ;;
   esac

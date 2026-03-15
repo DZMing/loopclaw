@@ -11,7 +11,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/zhimingdeng/lobster-perpetual-engine.git
+git clone https://github.com/DZMing/loopclaw.git
 cd lobster-perpetual-engine
 npm install
 npm run build

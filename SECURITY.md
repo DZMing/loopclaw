@@ -11,7 +11,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Please report security issues by emailing the maintainer directly or opening a [private security advisory](https://github.com/zhimingdeng/lobster-perpetual-engine/security/advisories/new) on GitHub.
+Please report security issues by emailing the maintainer directly or opening a [private security advisory](https://github.com/DZMing/loopclaw/security/advisories/new) on GitHub.
 
 Include:
 

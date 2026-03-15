@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`src/plugin.ts` is the OpenClaw entrypoint and registers chat commands and services. Core runtime code lives in `src/engine/`, including the perpetual loop, orchestrators, scheduling, telemetry, retries, and analysis helpers. Shared config is in [`src/config.ts`](/Users/zhimingdeng/Documents/claude/龙虾自动驾使/src/config.ts). Tests live in `tests/`, with `engine.test.ts` for smoke-style checks and `benchmark.ts` for manual performance runs. Templates for generated mission files live in `templates/`. Build output goes to `dist/`; do not edit generated files there.
+`src/plugin.ts` is the OpenClaw entrypoint and registers chat commands and services. Core runtime code lives in `src/engine/`, including the perpetual loop, orchestrators, scheduling, telemetry, retries, and analysis helpers. Shared config is in [`src/config.ts`](src/config.ts). Tests live in `tests/`, with `engine.test.ts` for smoke-style checks and `benchmark.ts` for manual performance runs. Templates for generated mission files live in `templates/`. Build output goes to `dist/`; do not edit generated files there.
 
 ## Build, Test, and Development Commands
 

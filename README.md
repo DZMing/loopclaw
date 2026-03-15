@@ -211,4 +211,4 @@ npm run perf
 
 ## License
 
-[MIT](LICENSE) © 2026 zhimingdeng
+[MIT](LICENSE) © 2026 DZMing
