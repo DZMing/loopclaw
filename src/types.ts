@@ -62,39 +62,6 @@ export type PluginHookName =
   | "gateway_pre_stop"
   | "gateway_stop";
 
-// v2.48: HTTP 路由相关类型
-export interface HttpRequest {
-  method: string;
-  url: string;
-  headers?: Record<string, string>;
-  query?: Record<string, string>;
-  body?: any;
-}
-
-export interface HttpResponse {
-  json: (data: any) => void;
-  send: (data: any) => void;
-  statusCode: number;
-  setHeader: (name: string, value: string) => void;
-}
-
-export interface HttpRoute {
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  path: string;
-  handler: (req: HttpRequest, res: HttpResponse) => void | Promise<void>;
-}
-
-// v2.48: Gateway RPC 方法相关类型
-export interface GatewayMethod {
-  name: string;
-  description: string;
-  handler: (...args: unknown[]) => unknown | Promise<unknown>;
-  // handler 支持多种签名：
-  // - 无参数: () => T
-  // - 单参数: (arg: A) => T
-  // - 多参数: (arg1: A, arg2: B, ...) => T
-}
-
 export interface OpenClawPluginApi {
   id: string;
   name: string;
@@ -107,8 +74,10 @@ export interface OpenClawPluginApi {
   logger: PluginLogger;
   registerService: (service: OpenClawPluginService) => void;
   registerCommand: (command: OpenClawPluginCommandDefinition) => void;
-  registerHttpRoute?: (route: HttpRoute) => void; // v2.48: HTTP 路由注册（可选）
-  registerGatewayMethod?: (method: GatewayMethod) => void; // v2.48: Gateway RPC 方法注册（可选）
+  registerGatewayMethod?: (
+    method: string,
+    handler: (...args: unknown[]) => unknown | Promise<unknown>,
+  ) => void;
   on: <K extends PluginHookName>(
     hookName: K,
     handler: (event: any, ctx: any) => void | Promise<void>,

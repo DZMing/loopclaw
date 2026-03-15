@@ -353,131 +353,49 @@ export default function register(api: OpenClawPluginApi) {
     },
   });
 
-  // v2.48: 注册 HTTP 路由 - REST API 端点
-  try {
-    // GET /lobster/status - 获取引擎状态（需要认证）
-    api.registerHttpRoute &&
-      api.registerHttpRoute({
-        method: "GET",
-        path: "/lobster/status",
-        handler: async (_req, res) => {
-          const status = getEngineStatus();
-          res.json({
-            version: status.version,
-            running: status.running,
-            loopCount: status.loopCount,
-            avgLoopTimeMs: status.avgLoopTimeMs,
-            loopsPerSecond: status.loopsPerSecond,
-            memoryUsageMB: status.memoryUsageMB,
-            errorStats: status.errorStats,
-            contextSize: status.contextSize,
-            timestamp: status.timestamp,
-          });
-        },
-      });
+  // 注册 Gateway RPC 方法，签名：registerGatewayMethod(method: string, handler: fn)
+  if (api.registerGatewayMethod) {
+    api.registerGatewayMethod("lobster.getStatus", () => getEngineStatus());
 
-    // GET /lobster/health - 健康检查端点（不暴露内部细节）
-    api.registerHttpRoute &&
-      api.registerHttpRoute({
-        method: "GET",
-        path: "/lobster/health",
-        handler: async (_req, res) => {
-          const status = getEngineStatus();
-          res.statusCode = status.isHealthy ? 200 : 503;
-          res.json({ status: status.isHealthy ? "ok" : "unhealthy" });
-        },
-      });
+    api.registerGatewayMethod("lobster.isRunning", () =>
+      engineService.isRunning(),
+    );
 
-    logger.info("🌐 HTTP 路由已注册: GET /lobster/status, GET /lobster/health");
-  } catch (e) {
-    logger.warn(`⚠️ HTTP 路由注册失败 (可能 OpenClaw 版本不支持): ${e}`);
-  }
+    api.registerGatewayMethod("lobster.getLoopCount", () =>
+      engineService.getLoopCount(),
+    );
 
-  // v2.48: 注册 Gateway RPC 方法 - 允许其他插件调用引擎功能
-  try {
-    // lobster.getStatus() - 获取引擎状态
-    api.registerGatewayMethod &&
-      api.registerGatewayMethod({
-        name: "lobster.getStatus",
-        description: "获取永动引擎状态",
-        handler: () => {
-          const status = getEngineStatus();
-          return {
-            version: status.version,
-            running: status.running,
-            loopCount: status.loopCount,
-            avgLoopTimeMs: status.avgLoopTimeMs,
-            loopsPerSecond: status.loopsPerSecond,
-            memoryUsageMB: status.memoryUsageMB,
-            errorStats: status.errorStats,
-            contextSize: status.contextSize,
-            isHealthy: status.isHealthy,
-            timestamp: status.timestamp,
-          };
-        },
-      });
+    api.registerGatewayMethod("lobster.start", async (...args: unknown[]) => {
+      const ctx = args[0] as OpenClawPluginServiceContext | undefined;
+      try {
+        if (!engineService.isRunning()) {
+          await engineService.startLoop(ctx);
+          return { success: true, message: "永动引擎已启动" };
+        }
+        return { success: true, message: "引擎已在运行中" };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
 
-    // lobster.isRunning() - 检查引擎是否运行中
-    api.registerGatewayMethod &&
-      api.registerGatewayMethod({
-        name: "lobster.isRunning",
-        description: "检查永动引擎是否正在运行",
-        handler: () => engineService.isRunning(),
-      });
-
-    // lobster.getLoopCount() - 获取循环次数
-    api.registerGatewayMethod &&
-      api.registerGatewayMethod({
-        name: "lobster.getLoopCount",
-        description: "获取永动引擎循环次数",
-        handler: () => engineService.getLoopCount(),
-      });
-
-    // lobster.start() - 启动引擎
-    api.registerGatewayMethod &&
-      api.registerGatewayMethod({
-        name: "lobster.start",
-        description: "启动永动引擎",
-        handler: async (...args: unknown[]) => {
-          const ctx = args[0] as OpenClawPluginServiceContext | undefined;
-          try {
-            if (!engineService.isRunning()) {
-              await engineService.startLoop(ctx);
-              return { success: true, message: "永动引擎已启动" };
-            }
-            return { success: true, message: "引擎已在运行中" };
-          } catch (error) {
-            return {
-              success: false,
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-        },
-      });
-
-    // lobster.stop() - 停止引擎
-    api.registerGatewayMethod &&
-      api.registerGatewayMethod({
-        name: "lobster.stop",
-        description: "停止永动引擎",
-        handler: async (...args: unknown[]) => {
-          if (engineService.isRunning()) {
-            await engineService.stopLoop();
-            return {
-              success: true,
-              message: "永动引擎已停止",
-              loopCount: engineService.getLoopCount(),
-            };
-          }
-          return { success: true, message: "引擎未运行" };
-        },
-      });
+    api.registerGatewayMethod("lobster.stop", async () => {
+      if (engineService.isRunning()) {
+        await engineService.stopLoop();
+        return {
+          success: true,
+          message: "永动引擎已停止",
+          loopCount: engineService.getLoopCount(),
+        };
+      }
+      return { success: true, message: "引擎未运行" };
+    });
 
     logger.info(
-      "🔌 Gateway RPC 方法已注册: lobster.getStatus, lobster.isRunning, lobster.getLoopCount, lobster.start, lobster.stop",
+      "🔌 RPC 方法已注册: lobster.getStatus, lobster.isRunning, lobster.getLoopCount, lobster.start, lobster.stop",
     );
-  } catch (e) {
-    logger.warn(`⚠️ Gateway RPC 方法注册失败 (可能 OpenClaw 版本不支持): ${e}`);
   }
 
   // 注册 gateway_start 钩子
@@ -553,21 +471,7 @@ export default function register(api: OpenClawPluginApi) {
     "partner_compress",
     "partner_voice_report",
   ];
-  const REGISTERED_APIS = ["GET /lobster/status", "GET /lobster/health"];
-  const REGISTERED_RPC_METHODS = [
-    "lobster.getStatus",
-    "lobster.isRunning",
-    "lobster.getLoopCount",
-    "lobster.start",
-    "lobster.stop",
-  ];
   logger.info(
     `📋 可用命令 (${REGISTERED_COMMANDS.length}个): /${REGISTERED_COMMANDS.join(", /")}`,
-  );
-  logger.info(
-    `🌐 REST API (${REGISTERED_APIS.length}个): ${REGISTERED_APIS.join(", ")}`,
-  );
-  logger.info(
-    `🔌 RPC 方法 (${REGISTERED_RPC_METHODS.length}个): ${REGISTERED_RPC_METHODS.join(", ")}`,
   );
 }
