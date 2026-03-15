@@ -28,13 +28,6 @@ export default function register(api: OpenClawPluginApi) {
       `健康检查=${config.enableHealthCheck}`,
   );
 
-  // 安全警告：未配置 auth token 时所有端点对任意调用方开放
-  if (!process.env.OPENCLAW_AUTH_TOKEN) {
-    logger.warn(
-      "⚠️  OPENCLAW_AUTH_TOKEN 未配置 — HTTP 端点和 RPC 方法对任意调用方开放。生产环境请务必配置此变量。",
-    );
-  }
-
   // v2.48: 共享状态获取函数 - 消除重复代码
   const HEALTH_THRESHOLD_MB = 500; // 健康检查内存阈值（魔法数字常量化）
 
@@ -62,22 +55,6 @@ export default function register(api: OpenClawPluginApi) {
     channelId: string,
   ): { text: string; channelId: string } {
     return { text, channelId };
-  }
-
-  // v2.48: HTTP 端点认证检查 - 防止未授权访问
-  function checkHttpAuth(req: { headers?: Record<string, string> }): boolean {
-    const authToken = process.env.OPENCLAW_AUTH_TOKEN;
-    if (!authToken) return true; // 未配置 token 时允许访问（向后兼容）
-    const authHeader = req.headers?.["authorization"];
-    return authHeader === `Bearer ${authToken}`;
-  }
-
-  // v2.48: RPC 方法 token 校验 - 防止未授权 RPC 调用
-  function checkRpcAuth(args: unknown[]): boolean {
-    const authToken = process.env.OPENCLAW_AUTH_TOKEN;
-    if (!authToken) return true; // 未配置 token 时允许调用
-    const callerToken = args.find((a): a is string => typeof a === "string");
-    return callerToken === authToken;
   }
 
   function isEnabled(value: unknown): boolean {
@@ -383,12 +360,7 @@ export default function register(api: OpenClawPluginApi) {
       api.registerHttpRoute({
         method: "GET",
         path: "/lobster/status",
-        handler: async (req, res) => {
-          if (!checkHttpAuth(req)) {
-            res.statusCode = 401;
-            res.json({ error: "Unauthorized" });
-            return;
-          }
+        handler: async (_req, res) => {
           const status = getEngineStatus();
           res.json({
             version: status.version,
@@ -461,15 +433,12 @@ export default function register(api: OpenClawPluginApi) {
         handler: () => engineService.getLoopCount(),
       });
 
-    // lobster.start() - 启动引擎（需要 token 认证）
+    // lobster.start() - 启动引擎
     api.registerGatewayMethod &&
       api.registerGatewayMethod({
         name: "lobster.start",
         description: "启动永动引擎",
         handler: async (...args: unknown[]) => {
-          if (!checkRpcAuth(args)) {
-            return { success: false, error: "Unauthorized" };
-          }
           const ctx = args[0] as OpenClawPluginServiceContext | undefined;
           try {
             if (!engineService.isRunning()) {
@@ -486,15 +455,12 @@ export default function register(api: OpenClawPluginApi) {
         },
       });
 
-    // lobster.stop() - 停止引擎（需要 token 认证）
+    // lobster.stop() - 停止引擎
     api.registerGatewayMethod &&
       api.registerGatewayMethod({
         name: "lobster.stop",
         description: "停止永动引擎",
         handler: async (...args: unknown[]) => {
-          if (!checkRpcAuth(args)) {
-            return { success: false, error: "Unauthorized" };
-          }
           if (engineService.isRunning()) {
             await engineService.stopLoop();
             return {

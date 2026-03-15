@@ -93,37 +93,19 @@ bash install.sh --no-openclaw
 
 ### 环境变量
 
-| 变量                        | 默认值 | 说明                                                    |
-| --------------------------- | ------ | ------------------------------------------------------- |
-| `OPENCLAW_AUTH_TOKEN`       | 未设置 | **强烈建议设置** — HTTP 和 RPC 接口的 Bearer 鉴权 token |
-| `LOBSTER_COMPRESS_INTERVAL` | `3`    | 上下文压缩间隔（循环数）                                |
-| `LOBSTER_PERSIST_INTERVAL`  | `10`   | 状态持久化间隔（循环数）                                |
-| `LOBSTER_CACHE_TTL`         | `5000` | 文件分析缓存 TTL（毫秒）                                |
-| `LOBSTER_HEALTH_CHECK`      | `true` | 启用健康监控（防卡死）                                  |
-| `LOBSTER_METRICS`           | `true` | 启用性能指标收集                                        |
-| `LOBSTER_CACHE`             | `true` | 启用 AST 分析缓存                                       |
-
-> 默认仅监听本机，无需对外暴露。如需公网部署，建议设置 `OPENCLAW_AUTH_TOKEN` 作为访问凭证。
+| 变量                        | 默认值 | 说明                     |
+| --------------------------- | ------ | ------------------------ |
+| `LOBSTER_COMPRESS_INTERVAL` | `3`    | 上下文压缩间隔（循环数） |
+| `LOBSTER_PERSIST_INTERVAL`  | `10`   | 状态持久化间隔（循环数） |
+| `LOBSTER_CACHE_TTL`         | `5000` | 文件分析缓存 TTL（毫秒） |
+| `LOBSTER_HEALTH_CHECK`      | `true` | 启用健康监控（防卡死）   |
+| `LOBSTER_METRICS`           | `true` | 启用性能指标收集         |
+| `LOBSTER_CACHE`             | `true` | 启用 AST 分析缓存        |
 
 复制 `.env.example` 并填写：
 
 ```bash
 cp .env.example .env
-# 编辑 .env，至少设置 OPENCLAW_AUTH_TOKEN
-```
-
-### 认证
-
-HTTP 端点使用 Bearer Token：
-
-```bash
-curl -H "Authorization: Bearer your_token" http://localhost:PORT/lobster/status
-```
-
-RPC 调用需要在 args 中传入 token：
-
-```json
-{ "method": "lobster.start", "args": ["your_token"] }
 ```
 
 ## 架构
