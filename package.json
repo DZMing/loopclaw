@@ -1,6 +1,6 @@
 {
   "name": "lobster-perpetual-engine",
-  "version": "2.48.0",
+  "version": "2.50.0",
   "description": "LoopClaw — Zero-latency perpetual AI Agent engine for OpenClaw",
   "type": "module",
   "main": "dist/plugin.js",

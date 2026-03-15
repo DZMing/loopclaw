@@ -88,6 +88,8 @@ const ActionType = {
   ERROR_RECOVERY: "error_recovery",
   /** 正常执行行动：常规的业务操作 */
   EXECUTE: "execute",
+  /** 自动关闭行动：checkbox 任务全部完成后触发 */
+  AUTO_SHUTDOWN: "auto_shutdown",
 } as const;
 
 /**
@@ -298,6 +300,16 @@ const FormatConstants = {
 // ========== 辅助工具函数 ==========
 
 /**
+ * 转义正则表达式特殊字符
+ * @param s 待转义字符串
+ * @returns 转义后的字符串，可安全用于 RegExp 构造函数
+ * @internal
+ */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * 带超时的异步操作包装器
  *
  * 使用 AbortSignal.timeout() 为任何 Promise 添加超时保护。
@@ -428,6 +440,15 @@ export class PerpetualEngineService {
     timestamp: number;
     mission: string;
     boundaries: string;
+  } | null = null;
+  /** parseCheckboxTasks 结果缓存，key 为 mission 字符串 */
+  private checkboxCache: {
+    mission: string;
+    result: {
+      pendingTasks: string[];
+      totalTasks: number;
+      hasCheckboxFormat: boolean;
+    };
   } | null = null;
 
   // ========== 配置 ==========
@@ -723,8 +744,25 @@ export class PerpetualEngineService {
         // 2. 生成下一步行动
         const action = await this.planNextAction(mission, boundaries);
 
+        // 2.1 checkbox 模式全部完成 → 自动停止
+        if (action.type === ActionType.AUTO_SHUTDOWN) {
+          this.api.logger.info("✅ 所有任务已完成，自动停止循环");
+          await this.sendReport(ctx, {
+            loop: this.loopCountValue,
+            action: action.description,
+            result: "所有 checkbox 任务已完成，引擎自动停止",
+          });
+          await this.stopLoop();
+          break;
+        }
+
         // 3. 执行行动
         const result = await this.executeAction(action, ctx);
+
+        // 3.1 checkbox 模式：成功执行后标记该任务完成
+        if (action.checkboxTask !== undefined) {
+          await this.markTaskComplete(ctx, action.checkboxTask);
+        }
 
         // 4. 更新状态
         this.context.actions.push({
@@ -734,18 +772,21 @@ export class PerpetualEngineService {
           timestamp: Date.now(),
         });
 
-        // 5. 定期压缩上下文
+        // 5. 定期压缩上下文（仅在有溢出时才执行）
         if (
           this.loopCountValue % this.config.compressInterval === 0 &&
-          this.loopCountValue > 0
+          this.loopCountValue > 0 &&
+          (this.context.actions.length > this.config.maxActions ||
+            this.context.errors.length > this.config.maxErrors)
         ) {
           this.compressContext();
         }
 
-        // 5.1 定期清理过期缓存（防止内存泄漏）
+        // 5.1 定期清理过期缓存（防止内存泄漏，Map 非空时才遍历）
         if (
           this.loopCountValue % (this.config.compressInterval * 2) === 0 &&
-          this.loopCountValue > 0
+          this.loopCountValue > 0 &&
+          this.fileCache.size > 0
         ) {
           this.cleanExpiredCache();
         }
@@ -932,7 +973,18 @@ export class PerpetualEngineService {
     description: string;
     type: string;
     recoveryErrorTimestamp?: number;
+    checkboxTask?: string;
   }> {
+    // 优先级0：checkbox 模式——所有任务已完成 → 自动停止
+    const { pendingTasks, totalTasks, hasCheckboxFormat } =
+      this.parseCheckboxTasks(mission);
+    if (hasCheckboxFormat && totalTasks > 0 && pendingTasks.length === 0) {
+      return {
+        description: "所有任务已完成，准备停止循环",
+        type: ActionType.AUTO_SHUTDOWN,
+      };
+    }
+
     // 优先级1：处理未解决的错误
     const unresolvedErrors = this.context.errors.filter(
       (error) => !error.resolved && error.recoveryAttemptedAt === undefined,
@@ -957,6 +1009,16 @@ export class PerpetualEngineService {
     }
 
     // 优先级3：根据 MISSION 生成行动
+    // checkbox 模式：从未完成任务中取第一个；数字格式：走原有循环路径
+    if (hasCheckboxFormat) {
+      const task = pendingTasks[0];
+      return {
+        description: task,
+        type: ActionType.EXECUTE,
+        checkboxTask: task,
+      };
+    }
+
     const actions = this.parseMissionActions(mission);
 
     // 优先级4：默认维护行动
@@ -1028,6 +1090,108 @@ export class PerpetualEngineService {
     }
 
     return actions;
+  }
+
+  /**
+   * 解析 checkbox 格式任务（`- [ ]` / `- [x]`）
+   *
+   * 遍历 MISSION 文件的 "## 具体任务" 章节，识别 checkbox 格式行。
+   * 数字格式（`1. 任务`）不在计数范围内，两种格式互不干扰。
+   *
+   * @param mission MISSION 文件内容
+   * @returns `{ pendingTasks, totalTasks, hasCheckboxFormat }`
+   *   - `pendingTasks`：未勾选（`- [ ]`）任务的描述列表
+   *   - `totalTasks`：checkbox 格式任务总数（已勾选 + 未勾选）
+   *   - `hasCheckboxFormat`：是否存在 checkbox 格式任务
+   */
+  private parseCheckboxTasks(mission: string): {
+    pendingTasks: string[];
+    totalTasks: number;
+    hasCheckboxFormat: boolean;
+  } {
+    if (this.checkboxCache?.mission === mission) {
+      return this.checkboxCache.result;
+    }
+
+    const lines = mission.split("\n");
+    let inTasksSection = false;
+    let totalTasks = 0;
+    const pendingTasks: string[] = [];
+
+    for (const line of lines) {
+      if (
+        line.includes(MissionSections.TASKS) ||
+        line.includes(MissionSections.ALTERNATIVE_TASKS)
+      ) {
+        inTasksSection = true;
+        continue;
+      }
+      if (inTasksSection && line.startsWith("##")) break;
+      if (inTasksSection) {
+        const checked = line.match(/^-\s*\[x\]\s*(.+)/i);
+        const unchecked = line.match(/^-\s*\[\s*\]\s*(.+)/);
+        if (checked) {
+          totalTasks++;
+        }
+        if (unchecked) {
+          totalTasks++;
+          pendingTasks.push(unchecked[1].trim());
+        }
+      }
+    }
+
+    const result = {
+      pendingTasks,
+      totalTasks,
+      hasCheckboxFormat: totalTasks > 0,
+    };
+    this.checkboxCache = { mission, result };
+    return result;
+  }
+
+  /**
+   * 将 MISSION_PARTNER.md 中指定任务标记为 `[x]`
+   *
+   * 原子写入（tmp → rename），写入失败不影响主循环。
+   * 只在找到精确匹配的 `- [ ] <taskDescription>` 行时执行写入。
+   *
+   * @param ctx 服务上下文
+   * @param taskDescription 要标记完成的任务描述（精确匹配）
+   */
+  private async markTaskComplete(
+    ctx: OpenClawPluginServiceContext,
+    taskDescription: string,
+  ): Promise<void> {
+    try {
+      // 先清缓存，确保读到磁盘最新内容（避免用缓存旧内容覆盖文件）
+      this.missionCache = null;
+      this.checkboxCache = null;
+      const { mission: content } = await this.loadMissionFiles(ctx);
+      const updated = content.replace(
+        new RegExp(`^(- \\[\\s*\\] )${escapeRegExp(taskDescription)}$`, "m"),
+        `- [x] ${taskDescription}`,
+      );
+      if (updated === content) {
+        // 未找到匹配行：可能任务描述不一致，记录警告便于排查
+        this.api.logger.warn(
+          `⚠️ markTaskComplete: 未找到匹配任务 "${taskDescription}"，跳过标记`,
+        );
+        return;
+      }
+      const workspaceDir = this.contextManager.requireWorkspaceDir(ctx);
+      const missionPath = path.join(workspaceDir, MissionFileNames.MISSION);
+      const tmp = `${missionPath}.tmp`;
+      await fs.writeFile(tmp, updated, "utf-8");
+      await fs.rename(tmp, missionPath);
+      this.missionCache = null; // 写入后再次清缓存，确保下次读取新内容
+      this.checkboxCache = null;
+    } catch (err) {
+      // 标记失败不影响主循环，但记录警告便于发现持续性问题
+      const msg = err instanceof Error ? err.message : String(err);
+      this.api.logger.warn(
+        `⚠️ markTaskComplete 失败 ("${taskDescription}"): ${msg}`,
+      );
+    }
   }
 
   /**

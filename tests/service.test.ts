@@ -287,3 +287,204 @@ test("PerpetualEngineService should not mark recovery errors resolved before rem
     },
   );
 });
+
+// ========== checkbox 任务模式测试 ==========
+
+test("parseCheckboxTasks should detect checkbox format and return pending tasks", async () => {
+  await withTempWorkspace(
+    "lobster-checkbox-parse",
+    async ({ workspaceDir, stateDir }) => {
+      const engine = new PerpetualEngineService({ logger: createLogger() });
+      await engine.start({
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      });
+
+      const mission = `# MISSION\n\n## 具体任务\n- [ ] 任务A\n- [x] 任务B\n- [ ] 任务C\n`;
+      const result = (engine as any).parseCheckboxTasks(mission) as {
+        pendingTasks: string[];
+        totalTasks: number;
+        hasCheckboxFormat: boolean;
+      };
+
+      assert.equal(result.hasCheckboxFormat, true);
+      assert.equal(result.totalTasks, 3);
+      assert.deepEqual(result.pendingTasks, ["任务A", "任务C"]);
+    },
+  );
+});
+
+test("parseCheckboxTasks should return hasCheckboxFormat=false for numbered format", async () => {
+  await withTempWorkspace(
+    "lobster-checkbox-numbered",
+    async ({ workspaceDir, stateDir }) => {
+      const engine = new PerpetualEngineService({ logger: createLogger() });
+      await engine.start({
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      });
+
+      const mission = `# MISSION\n\n## 具体任务\n1. 任务A\n2. 任务B\n`;
+      const result = (engine as any).parseCheckboxTasks(mission) as {
+        pendingTasks: string[];
+        totalTasks: number;
+        hasCheckboxFormat: boolean;
+      };
+
+      assert.equal(result.hasCheckboxFormat, false);
+      assert.equal(result.totalTasks, 0);
+      assert.deepEqual(result.pendingTasks, []);
+    },
+  );
+});
+
+test("planNextAction should return auto_shutdown when all checkbox tasks are completed", async () => {
+  await withTempWorkspace(
+    "lobster-checkbox-shutdown",
+    async ({ workspaceDir, stateDir }) => {
+      const mission = `# MISSION\n\n## 具体任务\n- [x] 任务A\n- [x] 任务B\n`;
+      await fs.writeFile(
+        path.join(workspaceDir, "MISSION_PARTNER.md"),
+        mission,
+        "utf-8",
+      );
+
+      const engine = new PerpetualEngineService(
+        { logger: createLogger() },
+        { enableHealthCheck: false },
+      );
+      const context = {
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      };
+      await engine.start(context);
+      // loopCountValue starts at 0, skip init by bumping it
+      (engine as any).loopCountValue = 1;
+
+      const action = (await (engine as any).planNextAction(mission, "")) as {
+        type: string;
+        description: string;
+      };
+
+      assert.equal(action.type, "auto_shutdown");
+    },
+  );
+});
+
+test("planNextAction should return first pending checkbox task when tasks remain", async () => {
+  await withTempWorkspace(
+    "lobster-checkbox-pending",
+    async ({ workspaceDir, stateDir }) => {
+      const mission = `# MISSION\n\n## 具体任务\n- [x] 任务A\n- [ ] 任务B\n- [ ] 任务C\n`;
+      await fs.writeFile(
+        path.join(workspaceDir, "MISSION_PARTNER.md"),
+        mission,
+        "utf-8",
+      );
+
+      const engine = new PerpetualEngineService(
+        { logger: createLogger() },
+        { enableHealthCheck: false },
+      );
+      const context = {
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      };
+      await engine.start(context);
+      (engine as any).loopCountValue = 1;
+
+      const action = (await (engine as any).planNextAction(mission, "")) as {
+        type: string;
+        description: string;
+        checkboxTask?: string;
+      };
+
+      assert.equal(action.type, "execute");
+      assert.equal(action.description, "任务B");
+      assert.equal(action.checkboxTask, "任务B");
+    },
+  );
+});
+
+test("markTaskComplete should update MISSION_PARTNER.md and clear cache", async () => {
+  await withTempWorkspace(
+    "lobster-mark-complete",
+    async ({ workspaceDir, stateDir }) => {
+      const missionPath = path.join(workspaceDir, "MISSION_PARTNER.md");
+      await fs.writeFile(
+        missionPath,
+        `# MISSION\n\n## 具体任务\n- [ ] 任务A\n- [ ] 任务B\n`,
+        "utf-8",
+      );
+
+      const engine = new PerpetualEngineService(
+        { logger: createLogger() },
+        { enableHealthCheck: false, enableCache: false },
+      );
+      const context = {
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      };
+      await engine.start(context);
+
+      await (engine as any).markTaskComplete(context, "任务A");
+
+      const content = await fs.readFile(missionPath, "utf-8");
+      assert.match(content, /- \[x\] 任务A/);
+      assert.match(content, /- \[ \] 任务B/);
+    },
+  );
+});
+
+test("engine should auto-stop when all checkbox tasks are completed", async () => {
+  await withTempWorkspace(
+    "lobster-checkbox-autostop",
+    async ({ workspaceDir, stateDir }) => {
+      await fs.writeFile(
+        path.join(workspaceDir, "MISSION_PARTNER.md"),
+        `# MISSION\n\n## 具体任务\n- [x] 已完成任务A\n- [x] 已完成任务B\n`,
+        "utf-8",
+      );
+
+      const engine = new PerpetualEngineService(
+        { logger: createLogger() },
+        {
+          reportInterval: 1,
+          compressInterval: 10,
+          persistInterval: 100,
+          enableHealthCheck: false,
+          enableCache: false,
+        },
+      );
+      await engine.start({
+        config: {},
+        workspaceDir,
+        stateDir,
+        logger: createLogger(),
+      });
+      await engine.startFromCommand({
+        channel: "channel-checkbox",
+        commandBody: "",
+        config: {},
+        isAuthorizedSender: true,
+      });
+
+      await eventually(
+        async () => {
+          assert.equal(engine.isRunning(), false);
+        },
+        { timeoutMs: 3000, intervalMs: 50 },
+      );
+    },
+  );
+});

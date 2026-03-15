@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.50.0] - 2026-03-15
+
+### Performance
+
+- **`parseCheckboxTasks` result cache**: results are now cached keyed by mission string; the full line-scan is skipped on every loop iteration where the mission file hasn't changed — cache is invalidated whenever `markTaskComplete` writes to disk
+- **`compressContext` guard**: the compress call (every N loops) is now skipped unless `actions` or `errors` actually exceeds their configured limits, eliminating unnecessary array allocations
+- **`cleanExpiredCache` guard**: the `fileCache` traversal is skipped when the Map is empty (the common case), removing a no-op iteration every 2N loops
+
+## [2.49.0] - 2026-03-15
+
+### Added
+
+- **Finite task mode**: write tasks as Markdown checkboxes (`- [ ] task`) in `MISSION_PARTNER.md`; the engine executes them in order, marks each `[x]` on completion, and auto-stops when all tasks are done
+- `parseCheckboxTasks()` private method — detects checkbox format and returns pending/total task counts
+- `markTaskComplete()` private method — atomic tmp-rename write to mark a task `[x]`; clears mission cache before reading to prevent stale-content overwrites; warns on match failure or I/O error instead of failing silently
+- `ActionType.AUTO_SHUTDOWN` constant for the new auto-stop action type
+- `escapeRegExp()` helper for safe use of task descriptions in `RegExp` constructor
+- 6 new test cases covering checkbox parsing, `planNextAction` routing, `markTaskComplete` writes, and end-to-end auto-stop
+
+### Changed
+
+- `planNextAction()` priority 0 (new): returns `auto_shutdown` when all checkbox tasks are complete; priority 3 updated to use pending checkbox tasks when in checkbox mode (numbered format unchanged — fully backward-compatible)
+- `runLoop()`: handles `auto_shutdown` action (sends completion report, calls `stopLoop()`, breaks loop); calls `markTaskComplete()` after a successful checkbox-mode execution
+
 ## [2.48.0] - 2026-03-15
 
 ### Added
