@@ -1,0 +1,102 @@
+{
+  "id": "lobster-perpetual-engine",
+  "name": "龙虾永动引擎",
+  "description": "零延迟永动循环引擎 - 24/7/365 自治运行",
+  "version": "2.48.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "description": "是否启用永动引擎"
+      },
+      "auto_start_engine": {
+        "type": "boolean",
+        "description": "Gateway 启动时自动启动引擎"
+      },
+      "compressInterval": {
+        "type": "number",
+        "description": "上下文压缩间隔（循环次数）",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "persistInterval": {
+        "type": "number",
+        "description": "状态持久化间隔（循环次数）",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "reportInterval": {
+        "type": "number",
+        "description": "状态汇报间隔（循环次数）",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "cacheTTL": {
+        "type": "number",
+        "description": "文件缓存有效期（毫秒）",
+        "minimum": 100,
+        "maximum": 60000
+      },
+      "stallThreshold": {
+        "type": "number",
+        "description": "卡死检测阈值（毫秒）",
+        "minimum": 1000,
+        "maximum": 300000
+      },
+      "healthCheckInterval": {
+        "type": "number",
+        "description": "健康检查间隔（毫秒）",
+        "minimum": 1000,
+        "maximum": 300000
+      },
+      "maxActions": {
+        "type": "number",
+        "description": "上下文中保留的最大行动数",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "maxErrors": {
+        "type": "number",
+        "description": "上下文中保留的最大错误数",
+        "minimum": 1,
+        "maximum": 500
+      },
+      "enableHealthCheck": {
+        "type": "boolean",
+        "description": "启用健康检查"
+      },
+      "enableMetrics": {
+        "type": "boolean",
+        "description": "启用性能指标"
+      },
+      "enableCache": {
+        "type": "boolean",
+        "description": "启用文件缓存"
+      },
+      "llmProvider": {
+        "type": "string",
+        "description": "LLM 提供商",
+        "enum": ["openclaw", "openai", "anthropic", "ollama", "vllm", "custom"]
+      },
+      "llmModel": {
+        "type": "string",
+        "description": "LLM 模型名称"
+      },
+      "llmBaseURL": {
+        "type": "string",
+        "description": "LLM API 基础地址"
+      },
+      "reportTarget": {
+        "type": "string",
+        "description": "汇报目标",
+        "enum": ["state", "log", "telegram", "discord"]
+      },
+      "reportChannel": {
+        "type": "string",
+        "description": "外部汇报目标标识"
+      }
+    }
+  }
+}

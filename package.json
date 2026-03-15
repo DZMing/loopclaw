@@ -1,0 +1,50 @@
+{
+  "name": "lobster-perpetual-engine",
+  "version": "2.48.0",
+  "description": "LoopClaw — Zero-latency perpetual AI Agent engine for OpenClaw",
+  "type": "module",
+  "main": "dist/plugin.js",
+  "openclaw": {
+    "id": "lobster-perpetual-engine",
+    "entry": "dist/plugin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "node scripts/postbuild.mjs",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "c8 node --import tsx --test tests/**/*.test.ts",
+    "coverage": "c8 report --reporter=text-summary",
+    "pretest": "npm run build",
+    "perf": "tsx tests/benchmark.ts",
+    "preperf": "npm run build",
+    "lint": "npx tsc --noEmit",
+    "format": "npx prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "perpetual",
+    "engine"
+  ],
+  "author": "zhimingdeng",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DZMing/loopclaw.git"
+  },
+  "homepage": "https://github.com/DZMing/loopclaw#readme",
+  "bugs": {
+    "url": "https://github.com/DZMing/loopclaw/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "c8": "^11.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Cache
+.cache/
+.bun/
+.npm/
+
+# Testing coverage
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
+.claude.backup.*/
+.claude-progress.txt.bak
+
+# Temporary files
+*.tmp
+*.temp
+task_plan.md
+notes.md
+
+# Runtime generated MISSION files
+MISSION_PARTNER.md
+BOUNDARIES_PARTNER.md
+
+# Dev-only artifacts
+claude-progress.txt
+audit-report.md
+*.backup
+dev/
+
+# Untracked source files (dev/test scripts not part of public API)
+src/test.ts
+src/perf-test.ts
