@@ -391,8 +391,12 @@ export default function register(api: OpenClawPluginApi) {
       );
       if (autoStart && !engineService.isRunning()) {
         logger.info("🚀 配置了自动启动，引擎自动启动");
+        // 若 ctx.workspaceDir 存在则使用（测试场景/OpenClaw 提供了路径）；
+        // 否则传 undefined，让 startLoop 依赖 service.start() 已保存的运行时上下文。
+        // 这样可避免 gateway_start 时 ctx.workspaceDir=undefined 覆盖已有的合法路径。
+        const startCtx = ctx?.workspaceDir ? ctx : undefined;
         await engineService
-          .startLoop(ctx)
+          .startLoop(startCtx)
           .catch((err) =>
             logger.error(
               `自动启动失败: ${err instanceof Error ? err.message : String(err)}`,

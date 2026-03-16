@@ -24,7 +24,6 @@ export interface RegisteredPluginArtifacts {
     >
   >;
   rpcMethods: Map<string, (...args: unknown[]) => unknown | Promise<unknown>>;
-  httpRoutes: Array<unknown>;
 }
 
 export function createLogger() {
@@ -44,7 +43,6 @@ export function createMockApi(
     services: new Map(),
     hooks: new Map(),
     rpcMethods: new Map(),
-    httpRoutes: [],
   };
 
   const logger = createLogger();
@@ -54,6 +52,7 @@ export function createMockApi(
     name: "lobster-test-plugin",
     source: "test",
     config,
+    pluginConfig: config,
     runtime: {},
     logger,
     registerService(service) {
@@ -62,11 +61,8 @@ export function createMockApi(
     registerCommand(command) {
       artifacts.commands.set(command.name, command);
     },
-    registerHttpRoute(route) {
-      artifacts.httpRoutes.push(route);
-    },
-    registerGatewayMethod(method) {
-      artifacts.rpcMethods.set(method.name, method.handler);
+    registerGatewayMethod(method, handler) {
+      artifacts.rpcMethods.set(method, handler);
     },
     on(hookName, handler) {
       const handlers = artifacts.hooks.get(hookName) ?? [];
