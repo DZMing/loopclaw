@@ -19,7 +19,10 @@ const PLUGIN_VERSION = "v2.50.0";
 
 export default function register(api: OpenClawPluginApi) {
   const logger = api.logger;
-  const config = loadConfig(api.config); // 从OpenClaw配置读取
+  // api.config 是整个 openclaw.json 根对象，api.pluginConfig 才是插件专属配置
+  const config = loadConfig(
+    api.pluginConfig as Record<string, unknown> | undefined,
+  );
   const engineService = new PerpetualEngineService(api, config);
 
   logger.info(
@@ -401,10 +404,12 @@ export default function register(api: OpenClawPluginApi) {
   // 注册 gateway_start 钩子
   api.on(
     "gateway_start",
-    async (event, ctx) => {
+    async (_event, ctx) => {
       logger.info("🦞 Gateway 启动，永动引擎就绪");
-      // 从OpenClaw配置读取自动启动设置
-      const autoStart = isEnabled(api.config.auto_start_engine);
+      // 从插件专属配置读取自动启动设置（api.pluginConfig 才是插件 config，api.config 是全局 openclaw.json）
+      const autoStart = isEnabled(
+        (api.pluginConfig as Record<string, unknown>)?.auto_start_engine,
+      );
       if (autoStart && !engineService.isRunning()) {
         logger.info("🚀 配置了自动启动，引擎自动启动");
         await engineService
@@ -423,7 +428,7 @@ export default function register(api: OpenClawPluginApi) {
   // 在 gateway 停止前触发，用于优雅关闭准备
   api.on(
     "gateway_pre_stop",
-    async (event, ctx) => {
+    async (_event, _ctx) => {
       logger.info("🦞 Gateway 即将停止，准备优雅关闭");
 
       // v2.48: 使用共享状态函数获取最终统计
@@ -450,7 +455,7 @@ export default function register(api: OpenClawPluginApi) {
   // 注册 gateway_stop 钩子
   api.on(
     "gateway_stop",
-    async (event, ctx) => {
+    async (_event, _ctx) => {
       logger.info("🦞 Gateway 停止，永动引擎清理中");
       if (engineService.isRunning()) {
         await engineService.stopLoop();
