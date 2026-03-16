@@ -36,28 +36,17 @@ export default function register(api: OpenClawPluginApi) {
 
   // v2.48: 权限检查辅助函数 - 消除重复逻辑
   function checkAuth(
-    ctx: { isAuthorizedSender: boolean; senderId?: string; channel?: string },
+    ctx: { isAuthorizedSender: boolean; senderId?: string },
     action: string,
-  ): { authorized: boolean; response?: { text: string; channelId: string } } {
+  ): { authorized: boolean; response?: { text: string } } {
     if (!ctx.isAuthorizedSender) {
       logger.warn(`🚫 未授权用户尝试${action}: ${ctx.senderId || "unknown"}`);
       return {
         authorized: false,
-        response: {
-          text: `❌ 权限不足：只有授权用户才能${action}`,
-          channelId: ctx.channel || "",
-        },
+        response: { text: `❌ 权限不足：只有授权用户才能${action}` },
       };
     }
     return { authorized: true };
-  }
-
-  // v2.48: 统一命令响应辅助函数
-  function commandResponse(
-    text: string,
-    channelId: string,
-  ): { text: string; channelId: string } {
-    return { text, channelId };
   }
 
   function isEnabled(value: unknown): boolean {
@@ -141,7 +130,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "start_partner",
     description: "启动零延迟永动循环引擎",
-    requireAuth: true,
     handler: async (ctx) => {
       // v2.48: 使用统一权限检查
       const authCheck = checkAuth(ctx, "启动引擎");
@@ -154,8 +142,9 @@ export default function register(api: OpenClawPluginApi) {
       );
       await engineService.startFromCommand(ctx);
 
-      return commandResponse(
-        "🦞 永动引擎已启动\n\n" +
+      return {
+        text:
+          "🦞 永动引擎已启动\n\n" +
           "状态: " +
           (engineService.isRunning() ? "运行中" : "启动中...") +
           "\n" +
@@ -163,8 +152,7 @@ export default function register(api: OpenClawPluginApi) {
           engineService.getLoopCount() +
           "\n\n" +
           "使用 /stop_partner 停止引擎",
-        ctx.channel,
-      );
+      };
     },
   });
 
@@ -172,7 +160,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "stop_partner",
     description: "停止永动循环引擎",
-    requireAuth: true,
     handler: async (ctx) => {
       // v2.48: 使用统一权限检查
       const authCheck = checkAuth(ctx, "停止引擎");
@@ -183,14 +170,14 @@ export default function register(api: OpenClawPluginApi) {
       logger.info(`🛑 收到停止命令 (用户: ${ctx.senderId || "unknown"})`);
       await engineService.stopLoop();
 
-      return commandResponse(
-        "🛑 永动引擎已停止\n\n" +
+      return {
+        text:
+          "🛑 永动引擎已停止\n\n" +
           "总循环次数: " +
           engineService.getLoopCount() +
           "\n" +
           "使用 /start_partner 重新启动",
-        ctx.channel,
-      );
+      };
     },
   });
 
@@ -198,7 +185,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "partner_status",
     description: "查看永动引擎状态",
-    requireAuth: true,
     handler: async () => {
       const status = getEngineStatus();
       return { text: formatStatusText(status) };
@@ -209,7 +195,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "partner_mission",
     description: "设置或查看永动引擎的任务目标（MISSION）",
-    requireAuth: true,
     acceptsArgs: true, // v2.48: 声明接受参数
     handler: async (ctx) => {
       // v2.48: 优先使用 commandBody 获取完整命令文本
@@ -258,7 +243,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "partner_analyze",
     description: "触发代码质量分析并返回报告",
-    requireAuth: true,
     handler: async (ctx) => {
       logger.info("📊 触发代码分析");
       const authCheck = checkAuth(ctx, "执行代码分析");
@@ -277,7 +261,6 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "partner_compress",
     description: "手动触发上下文压缩",
-    requireAuth: true,
     handler: async () => {
       // v2.47: 使用公开的 compressContextNow 方法
       const result = engineService.compressContextNow();
@@ -308,8 +291,7 @@ export default function register(api: OpenClawPluginApi) {
   api.registerCommand({
     name: "partner_voice_report",
     description: "使用语音播报引擎状态（需要 TTS 支持）",
-    requireAuth: true,
-    handler: async (ctx) => {
+    handler: async (_ctx) => {
       const status = getEngineStatus();
 
       // 构建语音文本
@@ -329,30 +311,27 @@ export default function register(api: OpenClawPluginApi) {
               voice: "default",
             },
           );
-          return commandResponse(
-            "🎙️ 语音报告已生成: " +
+          return {
+            text:
+              "🎙️ 语音报告已生成: " +
               voiceText +
               "\n\n(音频长度: " +
               audioBuffer.length +
               " 字节)",
-            ctx.channel,
-          );
+          };
         } catch (e) {
           logger.warn(`TTS 失败: ${e}`);
-          return commandResponse(
-            "⚠️ TTS 语音生成失败，返回文本报告:\n\n" + voiceText,
-            ctx.channel,
-          );
+          return { text: "⚠️ TTS 语音生成失败，返回文本报告:\n\n" + voiceText };
         }
       }
 
       // TTS 不可用，返回文本报告
-      return commandResponse(
-        "📋 引擎状态（文本模式）:\n\n" +
+      return {
+        text:
+          "📋 引擎状态（文本模式）:\n\n" +
           voiceText +
           "\n\n提示: 语音功能需要 OpenClaw 运行时支持 TTS",
-        ctx.channel,
-      );
+      };
     },
   });
 
